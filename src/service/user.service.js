@@ -1,12 +1,12 @@
 const bcrypt = require("bcrypt");
+const { v4: uuidv4 } = require("uuid");
 const User = require("../database/models/user.model");
-const bookService = require("./books.service");
+const Book = require("../database/models/book.model");
 
 // Function to add a new user
 async function addUser(req, res) {
   const { name, age, email, group, username, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
-
   const user = await new User({
     name,
     age,
@@ -22,7 +22,7 @@ async function addUser(req, res) {
 
   try {
     await user.save();
-    res.status(200).json(user);
+    res.status(201).json(user);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -32,7 +32,7 @@ async function addUser(req, res) {
 async function findUserByUsername(username) {
   try {
     return await User.findOne({ username: username }).exec();
-  } catch(err) {
+  } catch (err) {
     throw err;
   }
 }
@@ -47,25 +47,26 @@ async function getUserById(id) {
 }
 
 async function updateUser(res, id, dataForUpdate) {
-    try {
-        const user = await User.findByIdAndUpdate(id, dataForUpdate, {new: true});
-        if(!user) {
-            res.status(404).json({ error: "User is not found" });
-        } else {
-            res.json(user)
-        }
-    } catch (err) {
-        throw err;
+  try {
+    const user = await User.findByIdAndUpdate(id, dataForUpdate, { new: true });
+
+    if (!user) {
+      res.status(404).json({ error: "User is not found" });
+    } else {
+      res.json({ result: "User was successfully updated" });
     }
+  } catch (err) {
+    throw err;
+  }
 }
 
 async function removeUser(res, id) {
   try {
     const user = await User.findByIdAndDelete(id);
-    if(!user) {
+    if (!user) {
       res.status(404).json("User is not found");
     } else {
-      res.send("User has been deleted...");
+      res.send(`User has been deleted..`);
     }
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -103,20 +104,31 @@ function validateCreateInput(params) {
   return newUser;
 }
 
-const takeBook = (user, bookId) => {
-  if (user.role === "STUDENT") {
-    if (user.blocked) throw new Error("You are blocked by admin");
-    const { book } = bookService.getById(bookId);
-    const index = UsersDB.findIndex((student) => {
-      return student.username === user.username;
+const takeBook = async (res, user, bookId) => {
+  const userDocument = await findUserByUsername(user.username);
+  try {
+    const book = await Book.findById(bookId);
+    if(!book) {
+      res.status(404).json({ error: "Book is not found" });
+    }
+
+    const isBookExist = userDocument.taken.find((book) => {
+      return book.bookId = bookId;
     });
-    UsersDB[index].taken.push({
-      book_id: book.id,
-      time: Date.now(),
-    });
-    return UsersDB[index];
-  } else {
-    throw new Error("You don't have a right to rent a book");
+    if(!isBookExist) {
+      userDocument.taken.push({
+        date: Date.now(),
+        bookId
+      });
+    
+      await userDocument.save();
+    
+      res.status(200).json({result: "Book has been successfully taken"});
+    } else {
+      res.status(200).json({ error: "Book has already been taken by you" })
+    }
+  } catch (err) {
+    res.status(400).json({ error: err.message })
   }
 };
 

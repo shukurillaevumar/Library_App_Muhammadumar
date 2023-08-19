@@ -61,7 +61,7 @@ router.delete("/:id", (req, res) => {
 router.post("/take", authorize, (req, res) => {
   const user = req.user;
   const bookId = req.body.bookId;
-  res.json(usersService.takeBook(user, bookId));
+  return (usersService.takeBook(res, user, bookId));
 });
 
 router.post("/return", (req, res) => {});
