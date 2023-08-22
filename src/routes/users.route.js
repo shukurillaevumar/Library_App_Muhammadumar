@@ -64,6 +64,8 @@ router.post("/take", authorize, (req, res) => {
   return (usersService.takeBook(res, user, bookId));
 });
 
-router.post("/return", (req, res) => {});
+router.post("/return", authorize, (req, res) => {
+  return usersService.returnBook(res, req.user, req.body.bookId)
+});
 
 module.exports = router;

@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const { v4: uuidv4 } = require("uuid");
 const User = require("../database/models/user.model");
 const Book = require("../database/models/book.model");
+const bookService = require("../service/books.service");
 
 // Function to add a new user
 async function addUser(req, res) {
@@ -109,7 +110,11 @@ const takeBook = async (res, user, bookId) => {
   try {
     const book = await Book.findById(bookId);
     if(!book) {
-      res.status(404).json({ error: "Book is not found" });
+      return res.status(404).json({ error: "Book is not found" });
+    }
+
+    if(book.amount <= 0) {
+      return res.status(400).json({ error: "Book is out of stock" });
     }
 
     const isBookExist = userDocument.taken.find((book) => {
@@ -120,10 +125,14 @@ const takeBook = async (res, user, bookId) => {
         date: Date.now(),
         bookId
       });
-    
-      await userDocument.save();
-    
-      res.status(200).json({result: "Book has been successfully taken"});
+      const amount = book.amount - 1;
+      const isBookDecreased = await bookService.changeAmount(bookId, amount);
+      if(isBookDecreased) {
+        await userDocument.save();
+        res.status(200).json({ result: "Book has been successfully taken" });
+      } else {
+        res.status(400).json({ error: "Book is out of stock" })
+      }
     } else {
       res.status(200).json({ error: "Book has already been taken by you" })
     }
@@ -132,7 +141,40 @@ const takeBook = async (res, user, bookId) => {
   }
 };
 
-const returnBook = () => {};
+const returnBook = async (res, user, bookId) => {
+  const userDocument = await findUserByUsername(user.username);
+  try {
+    const book = await Book.findById(bookId);
+    if(!book) {
+      return res.status(404).json({ error: "Book is not found" });
+    }
+
+    const isBookExist = userDocument.taken.find((book) => {
+      return book.bookId = bookId;
+    });
+
+    if(isBookExist) {
+      userDocument.returned.push({
+        date: Date.now(),
+        bookId
+      });
+
+      const amount = book.amount + 1;
+      const isBookDecreased = await bookService.changeAmount(bookId, amount);
+
+      if(isBookDecreased) {
+        await userDocument.save();
+        res.status(200).json({ result: "Book has been successfully returned" });
+      } else {
+        res.status(400).json({ error: "Book is out of stock" })
+      }
+    } else {
+      res.status(200).json({ error: "Book has already been returned by you" })
+    }
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+};
 
 const validateUpdateInput = (params) => {
   const { name, age, group, email, blocked, role, username, password } = params;

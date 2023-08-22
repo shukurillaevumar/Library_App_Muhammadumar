@@ -41,6 +41,21 @@ async function update(id, dataForUpdate, res) {
   }
 }
 
+async function changeAmount (id, amount) {
+  const bookAmount = amount < 0 ? 0 : amount;
+  try {
+    const book = await Book.findByIdAndUpdate(id, {amount: bookAmount}, {new: true});
+
+    if(!book) {
+      return false;
+    } else {
+      return true;
+    }
+  } catch (err) {
+    console.log(err);
+  }
+}
+
 function validateCreateInputs(req, res) {
   const { title, author, amount } = req.body;
   const result = {};
@@ -100,4 +115,5 @@ module.exports = {
   remove,
   validateCreateInputs,
   validateUpdateInputs,
+  changeAmount
 };
